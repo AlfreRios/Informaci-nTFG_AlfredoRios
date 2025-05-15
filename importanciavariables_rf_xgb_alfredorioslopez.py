@@ -157,7 +157,120 @@ plt.title("Matriz de Correlación entre Variables")
 plt.tight_layout()
 plt.show()
 
-"""**XGB con hiperparametros**"""
+"""**XGB con hiperparametros**
+
+Comparativa MAE y MSE
+"""
+
+import pandas as pd
+import numpy as np
+import xgboost as xgb
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# CARGA DE DATOS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+file_path = "/content/DatosTempHKObs__Finales.xlsx"
+data = pd.read_excel(file_path)
+data['Date'] = pd.to_datetime(data['Date'])
+
+# Eliminar columnas no deseadas
+cols_to_drop = ['Punto de rocio', 'Year', 'Month', 'Day']
+data = data.drop(columns=[col for col in cols_to_drop if col in data.columns])
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# DIVISIÓN ENTRE TRAIN Y TEST
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+train_data = data[data['Date'] < '2012-01-01']
+test_data = data[data['Date'] >= '2012-01-01']
+
+features = data.columns.difference(['Date', 'MaxTemp', 'MinTemp', 'MeanTemp'])
+X_train = train_data[features]
+X_test = test_data[features]
+
+targets = ['MaxTemp', 'MinTemp', 'MeanTemp']
+tscv = TimeSeriesSplit(n_splits=3)
+metrics_summary = []
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# FUNCIÓN DE EVALUACIÓN XGBOOST
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+def evaluate_xgboost_model(y_col, objective_name, scoring_metric):
+    y_train = train_data[y_col]
+    y_test = test_data[y_col]
+
+    print(f"\n🔍 XGBoost ({objective_name}) para: {y_col}")
+
+    model = xgb.XGBRegressor(objective=objective_name, n_jobs=-1, random_state=42)
+
+    param_grid = {
+        'max_depth': [3, 5],
+        'learning_rate': [0.05, 0.1],
+        'n_estimators': [100, 200],
+        'subsample': [0.8, 1],
+        'colsample_bytree': [0.8, 1]
+    }
+
+    grid_search = GridSearchCV(model, param_grid, cv=tscv, scoring=scoring_metric, verbose=0)
+    grid_search.fit(X_train, y_train)
+
+    best_model = grid_search.best_estimator_
+    print("✅ Mejores parámetros:", grid_search.best_params_)
+
+    y_train_pred = best_model.predict(X_train)
+    y_test_pred = best_model.predict(X_test)
+
+    # MÉTRICAS
+    def report_metrics(y_true, y_pred, label):
+        r2 = r2_score(y_true, y_pred)
+        mae = mean_absolute_error(y_true, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+        print(f"\n {label} - {y_col} ({objective_name})")
+        print(f"  R²:   {r2:.3f}")
+        print(f"  MAE:  {mae:.3f}")
+        print(f"  RMSE: {rmse:.3f}")
+        return r2, mae, rmse
+
+    r2_test, mae_test, rmse_test = report_metrics(y_test, y_test_pred, "Test")
+    report_metrics(y_train, y_train_pred, "Train")
+
+    # Guardar métricas
+    metrics_summary.append({
+        "Variable": y_col,
+        "Pérdida": objective_name,
+        "R2_Test": round(r2_test, 3),
+        "MAE_Test": round(mae_test, 3),
+        "RMSE_Test": round(rmse_test, 3)
+    })
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# EVALUAR TODAS LAS VARIABLES (MAE Y MSE)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+for target in targets:
+    evaluate_xgboost_model(target, objective_name='reg:absoluteerror', scoring_metric='neg_mean_absolute_error')
+    evaluate_xgboost_model(target, objective_name='reg:squarederror', scoring_metric='neg_mean_squared_error')
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# TABLA FINAL DE MÉTRICAS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+df_metrics = pd.DataFrame(metrics_summary)
+print("\n📊 Tabla resumen de métricas (Test):")
+print(df_metrics.to_string(index=False))
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# CORRELACIÓN DE VARIABLES
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+plt.figure(figsize=(10, 8))
+corr = data.drop(columns=['Date']).corr()
+sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", square=True)
+plt.title("Matriz de Correlación entre Variables")
+plt.tight_layout()
+plt.show()
+
+"""Importancia de las variables"""
 
 import pandas as pd
 import numpy as np
