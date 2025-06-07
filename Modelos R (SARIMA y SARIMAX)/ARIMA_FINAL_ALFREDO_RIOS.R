@@ -122,6 +122,11 @@ rss_test <- sum((real_vs_pred$Real - real_vs_pred$Predicho)^2)
 tss_test <- sum((real_vs_pred$Real - mean(real_vs_pred$Real))^2)
 r_squared_test <- 1 - (rss_test / tss_test)
 
+#MAPE
+mape_val <- mean(abs((real_vs_pred$Real - real_vs_pred$Predicho) / real_vs_pred$Real)) * 100
+
+
+
 # Residuos
 residuos <- residuals(modelo_validacion)
  
@@ -144,11 +149,13 @@ ggplot(residuos_df, aes(x = Fecha, y = Residuos)) +
 #Test de Ljung-Box
 ljung_box_test <- Box.test(residuos, lag = 12, type = "Ljung-Box")
 
+
 cat(" VALIDACIÓN (2012–2024)\n")
 cat("MAE:", round(mae_val, 3), "\n")
 cat("RMSE:", round(rmse_val, 3), "\n")
 cat("R²: ", r_squared_test, "\n")
 cat("Valor p de la prueba de Ljung-Box: ", ljung_box_test$p.value, "\n")
+cat("MAPE:", round(mape_val, 3), "\n")
 
 # Gráfico comparacion
 ggplot(real_vs_pred, aes(x = Fecha)) +
@@ -185,9 +192,11 @@ reales <- ts_data
 ajustados <- fitted(modelo_final)
 residuos <- residuals(modelo_final)
 
-# MAE y RMSE
+# MAE y RMSE y MAPE
 mae_val <- mae(reales, ajustados)
 rmse_val <- rmse(reales, ajustados)
+mape_val <- mean(abs((reales - ajustados) / reales)) * 100
+
 
 # R² 
 rss <- sum((reales - ajustados)^2)
@@ -203,7 +212,7 @@ cat("R²: ", round(r_squared, 4), "\n")
 cat("MAE:", round(mae_val, 4), "\n")
 cat("RMSE:", round(rmse_val, 4), "\n")
 cat("Ljung-Box p-valor:", round(ljung_box$p.value, 4), "\n")
-
+cat("MAPE:", round(mape_val, 4), "\n")
 
 # Realizar la prediccion
 forecast_values <- forecast(modelo_final, h = 120)
